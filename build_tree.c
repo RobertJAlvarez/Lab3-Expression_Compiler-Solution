@@ -18,7 +18,7 @@ static node_t *newNode(nodetype_t type, unsigned int data) {
   return p;
 }
 
-operator_t optable[NUMOPTYPES] = {
+const operator_t optable[NUMOPTYPES] = {
     {UNARYOP, 7, RL, "-", ""},      {BINARYOP, 5, LR, "+", "add"},
     {BINARYOP, 5, LR, "-", "sub"},  {BINARYOP, 6, LR, "*", "mul"},
     {BINARYOP, 6, LR, "/", "div"},  {BINARYOP, 3, LR, "&", "and"},

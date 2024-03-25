@@ -33,11 +33,11 @@ typedef struct {
   nodetype_t type;
   int prec;
   int assoc;
-  char symbol[3];
-  char instr[4];
+  const char symbol[3];
+  const char instr[4];
 } operator_t;
 
-extern operator_t optable[];
+extern const operator_t optable[];
 
 typedef struct node {
   nodetype_t type;
