@@ -201,17 +201,29 @@ static void __const_reg(node_t *root, node_t *left, node_t *right) {
 static void __const_const(node_t *root, node_t *left, node_t *right) {
   int a = left->data;
   int b = right->data;
-  char c = *optable[root->data].symbol;
+  int data;
 
   free(left);
   free(right);
 
-  root->type = CONST;
-  root->data =
-      (c == '+')
-          ? (a + b)
-          : ((c == '-') ? (a - b)
-                        : ((c == '*') ? (a * b) : ((c == '/') ? (a / b) : 0)));
+  switch (*optable[root->data].symbol) {
+    case '+':
+      data = a + b;
+      break;
+    case '-':
+      data = a - b;
+      break;
+    case '*':
+      data = a * b;
+      break;
+    case '.':
+      data = a / b;
+      break;
+    default:
+      data = 0;
+  }
+
+  SET_NODE(root, CONST, data);
 }
 
 static void __unary_op(node_t *root, node_t *left) {
