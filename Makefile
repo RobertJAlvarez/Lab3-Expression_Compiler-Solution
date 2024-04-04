@@ -1,21 +1,20 @@
 CC   = cc
 OBJS = build_tree.o backend.o
 
-FILE_NAME ?=
-
 CFLAGS = -O3 -g3 -Wall -Wextra -Werror=format-security -Werror=implicit-function-declaration \
          -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wwrite-strings -Wconversion
 
-all: main
+all: compile
 
-main: $(OBJS) main.o
+compile: $(OBJS) main.o
 	$(CC) -o $@ $^
 
-run: main
-	./main
+run: compile
+	./compile
 
 clean:
-	rm -f *.o main
+	DEL_TXT=$$(find . -name '*.txt' ! -name 'input*' ! -name 'output*'); \
+	rm -f *.o compile $$DEL_TXT
 
 build_tree.o: build_tree.c build_tree.h
 backend.o: backend.c build_tree.h
