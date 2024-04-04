@@ -26,7 +26,8 @@ typedef enum {
   SLL,
   SRL,
   LPAREN,
-  RPAREN
+  RPAREN,
+  ERROR_OP
 } ops_t;
 
 typedef struct {
