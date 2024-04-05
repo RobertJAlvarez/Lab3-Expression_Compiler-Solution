@@ -149,11 +149,45 @@ static ops_t __get_operation(const char expr[], size_t *j) {
   return op;
 }
 
+static int __pop_stack_add_children(operatorstack_t *opstack,
+                                    nodestack_t *nstack, node_t *t) {
+  node_t *t1, *t2;
+
+  // Pop the node stack
+  opstack->top--;
+
+  if (t->type == UNARYOP) {
+    t2 = nstack->nodes[nstack->top - 1];
+    nstack->top--;
+    t1 = NULL;
+  } else {
+    t1 = nstack->nodes[nstack->top - 1];
+    nstack->top--;
+    t2 = nstack->nodes[nstack->top - 1];
+    nstack->top--;
+  }
+
+  // Add child/children and push new node on node stack
+  t->left = t2;
+  t->right = t1;
+  if (nstack->top < MAXNODES) {
+    nstack->nodes[nstack->top] = t;
+    nstack->top++;
+  } else {
+    printf("Error: too many nodes\n");
+    return 1;
+  }
+
+  return 0;
+}
+
 static int __make_nodes(operatorstack_t *opstack, nodestack_t *nstack,
                         const ops_t op) {
-  node_t *t, *t1, *t2;
+  node_t *t;
 
-  while (opstack->top > 0 && opstack->ops[opstack->top - 1] != LPAREN &&
+  while (opstack->top > 0 &&  // More things to pop
+         opstack->ops[opstack->top - 1] !=
+             LPAREN &&  // We are not in open parenthesis
          ((optable[op].assoc == LR &&
            optable[opstack->ops[opstack->top - 1]].prec >= optable[op].prec) ||
           (optable[op].assoc == RL &&
@@ -167,29 +201,9 @@ static int __make_nodes(operatorstack_t *opstack, nodestack_t *nstack,
       return 1;
     }
 
-    opstack->top--;
-    // Pop the node stack
-    if (t->type == UNARYOP) {
-      t2 = nstack->nodes[nstack->top - 1];
-      nstack->top--;
-      t1 = NULL;
-    } else {
-      t1 = nstack->nodes[nstack->top - 1];
-      nstack->top--;
-      t2 = nstack->nodes[nstack->top - 1];
-      nstack->top--;
-    }
-    // Add child/children and push new node on node stack
-    t->left = t2;
-    t->right = t1;
-    if (nstack->top < MAXNODES) {
-      nstack->nodes[nstack->top] = t;
-      nstack->top++;
-    } else {
-      printf("Error: too many nodes\n");
-      return 1;
-    }
-  }  // end while
+    if (__pop_stack_add_children(opstack, nstack, t)) return 1;
+  }
+
   // Push op onto opstack
   if (opstack->top < MAXOPS) {
     opstack->ops[opstack->top] = ((int)op);
@@ -204,7 +218,7 @@ static int __make_nodes(operatorstack_t *opstack, nodestack_t *nstack,
 
 static int __pop_right_parenthesis(operatorstack_t *opstack,
                                    nodestack_t *nstack) {
-  node_t *t, *t1, *t2;
+  node_t *t;
 
   while (opstack->top > 0 && opstack->ops[opstack->top - 1] != LPAREN) {
     // Pop the operator stack and create node for popped op
@@ -216,31 +230,12 @@ static int __pop_right_parenthesis(operatorstack_t *opstack,
       return 1;
     }
 
-    opstack->top--;
     if (t->data == 12) return 1;
 
-    // Pop the node stack
-    if (t->type == UNARYOP) {
-      t2 = nstack->nodes[nstack->top - 1];
-      nstack->top--;
-      t1 = NULL;
-    } else {
-      t1 = nstack->nodes[nstack->top - 1];
-      nstack->top--;
-      t2 = nstack->nodes[nstack->top - 1];
-      nstack->top--;
-    }
-    // Add child/children and push new node on node stack
-    t->left = t2;
-    t->right = t1;
-    if (nstack->top < MAXNODES) {
-      nstack->nodes[nstack->top] = t;
-      nstack->top++;
-    } else {
-      printf("Error: too many nodes\n");
-      return 1;
-    }
+    if (__pop_stack_add_children(opstack, nstack, t)) return 1;
   }
+
+  if (opstack->top > 0) opstack->top--;
 
   return 0;
 }
@@ -278,18 +273,23 @@ node_t *build_tree(char exprin[]) {
         return (NULL);
       }
     } else if (isalpha(expr[i])) {
+      // Read variable
       if (__read_variable(expr, i, &nstack)) return NULL;
     } else if (isdigit(expr[i])) {
+      // Read digit
       if (__read_digit(expr, &i, &nstack)) return NULL;
     } else {
-      // operator
+      // Operator
       if ((op = __get_operation(expr, &i)) == ERROR_OP) return NULL;
 
+      // If we find an operator (not a parenthesis)
       if (optable[op].prec > 0) {
         if (__make_nodes(&opstack, &nstack, op)) return NULL;
-      } else if (op == RPAREN) {
+      }
+      // If right parenthesis, pop operator and create nodes until left
+      // parenthesis
+      else if (op == RPAREN) {
         if (__pop_right_parenthesis(&opstack, &nstack)) return NULL;
-        if (opstack.top > 0) opstack.top--;
       }
     }
     i++;

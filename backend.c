@@ -7,7 +7,7 @@
 
 #define SET_NODE(NODE, TYPE, DATA) \
   NODE->type = TYPE;               \
-  NODE->data = (DATA);
+  NODE->data = DATA;
 
 int regtable[NUMREG];  // reg[i] contains current number of uses of register i
 int vartable[NUMVAR];  // var[i] contains register to which var is assigned
@@ -179,10 +179,11 @@ static void __reg_const(node_t *root, node_t *left, node_t *right) {
     printf("addi x%d, x%d, -%d\n", destreg, left->data, right->data);
     SET_NODE(root, REG, destreg);
   } else {
-    destreg = assign_reg(-1);
-    // TODO: This line is executed with a*1000 with addi x6 x5 1000 instead of
-    // addi x6 x0 1000
-    sprintf(instr, "addi x%d, x%d, %d", destreg, left->data, right->data);
+    if ((destreg = assign_reg(-1)) == -1) {
+      printf("Error: out of registers\n");
+      exit(-1);
+    }
+    sprintf(instr, "addi x%d, x0, %d", destreg, right->data);
     __pre_gen_code(instr, destreg, root, right);
   }
 }
@@ -200,7 +201,10 @@ static void __const_reg(node_t *root, node_t *left, node_t *right) {
   if (__is_slli(root, left)) {
     __slli(destreg, root, right, left);
   } else {
-    destreg = assign_reg(-1);
+    if ((destreg = assign_reg(-1)) == -1) {
+      printf("Error: out of registers\n");
+      exit(-1);
+    }
     sprintf(instr, "addi x%d, x0, %d", destreg, left->data);
     __pre_gen_code(instr, destreg, root, left);
   }
@@ -224,8 +228,17 @@ static void __const_const(node_t *root, node_t *left, node_t *right) {
     case '*':
       data = a * b;
       break;
-    case '.':
+    case '/':
       data = a / b;
+      break;
+    case '|':
+      data = a | b;
+      break;
+    case '&':
+      data = a & b;
+      break;
+    case '^':
+      data = a ^ b;
       break;
     default:
       data = 0;
@@ -267,10 +280,10 @@ static void __unary_op(node_t *root, node_t *left) {
       free(left);
       SET_NODE(root, REG, destreg);
     } else if (left->type == CONST) {
-      destreg = assign_reg(-1);
-      printf("addi x%d, x%d, -1\n", destreg, left->data);
+      SET_NODE(root, CONST, ~left->data);
+      root->left = NULL;
+      root->right = NULL;
       free(left);
-      SET_NODE(root, REG, destreg);
     }
   }
 }
