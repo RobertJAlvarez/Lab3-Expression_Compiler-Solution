@@ -9,8 +9,10 @@
   NODE->type = TYPE;               \
   NODE->data = DATA;
 
-int regtable[NUMREG];  // reg[i] contains current number of uses of register i
-int vartable[NUMVAR];  // var[i] contains register to which var is assigned
+// reg[i] contains current number of uses of register i
+int regtable[NUMREG];
+// var[i] contains register to which var is assigned
+int vartable[NUMVAR];
 
 void init_regtable(void) {
   for (int i = 0; i < NUMREG; i++) regtable[i] = 0;
@@ -113,19 +115,30 @@ static void __reg_reg(node_t *root, node_t *left, node_t *right) {
   __done_w_instr(destreg, root, left, right, /*is_imm=*/0);
 }
 
-static void __lui_data(int destreg, node_t *node) {
-  printf("lui x%d, %d\n", destreg, node->data - 2047);
-  node->data = 2047;
+static void __lui_data(node_t *node) {
+  int destreg;
+
+  if ((destreg = assign_reg(-1)) == -1) {
+    printf("Error: out of registers\n");
+    exit(-1);
+  }
+
+  // TODO: Check for negative numbers
+
+  printf("lui x%d, %d\n", destreg, node->data >> 12);
+  if (node->data & 0xFFF) {
+    printf("addi x%d, x%d, %d\n", destreg, destreg, node->data & 0xFFF);
+  }
+
+  SET_NODE(node, REG, destreg);
 }
 
 static inline int __is_slli(node_t *root, node_t *node) {
-  return (*optable[root->data].symbol == '*') &&
-         (__isPowerTwo(node->data) != 0);
+  return (root->data == MUL) && (__isPowerTwo(node->data) != 0);
 }
 
 static inline int __is_srai(node_t *root, node_t *node) {
-  return (*optable[root->data].symbol == '/') &&
-         (__isPowerTwo(node->data) != 0);
+  return (root->data == DIV) && (__isPowerTwo(node->data) != 0);
 }
 
 static void __slli(int destreg, node_t *root, node_t *node1, node_t *node2) {
@@ -144,11 +157,6 @@ static void __srai(int destreg, node_t *root, node_t *node1, node_t *node2) {
   SET_NODE(root, REG, destreg);
 }
 
-static inline int __is_shift(node_t *root) {
-  return (*optable[root->data].symbol == '<') ||
-         (*optable[root->data].symbol == '>');
-}
-
 static void __pre_gen_code(char instr[], int destreg, node_t *root,
                            node_t *node) {
   printf("%s\n", instr);
@@ -158,47 +166,72 @@ static void __pre_gen_code(char instr[], int destreg, node_t *root,
 
 static void __reg_const(node_t *root, node_t *left, node_t *right) {
   char instr[20];
-  int destreg = left->data;
+  int destreg;
 
-  if (right->data >= 2048) {
-    __lui_data(destreg, right);
+  if (right->data & (~0xFFF)) {
+    __lui_data(right);
     generate_code(root);
     return;
   }
 
-  if (__is_slli(root, right)) {
-    __slli(destreg, root, left, right);
-  } else if (__is_srai(root, right)) {
-    __srai(destreg, root, left, right);
-  } else if (__is_shift(root)) {
-    __done_w_instr(destreg, root, left, right, /*is_imm=*/1);
-  } else if (*optable[root->data].symbol == '+') {
-    printf("addi x%d, x%d, %d\n", destreg, left->data, right->data);
-    SET_NODE(root, REG, destreg);
-  } else if (*optable[root->data].symbol == '-') {
-    printf("addi x%d, x%d, -%d\n", destreg, left->data, right->data);
-    SET_NODE(root, REG, destreg);
-  } else {
+  // muli and divi are not valid instructions. Move constant value to a register
+  if ((!__isPowerTwo(right->data)) &&
+      ((root->data == MUL) || (root->data == DIV))) {
+    // Get new register to store constant value
     if ((destreg = assign_reg(-1)) == -1) {
       printf("Error: out of registers\n");
       exit(-1);
     }
     sprintf(instr, "addi x%d, x0, %d", destreg, right->data);
     __pre_gen_code(instr, destreg, root, right);
+    return;
+  }
+
+  // Get register to assign operation
+  if (__reuse_reg(left->data) == 1) {
+    destreg = left->data;
+  } else {
+    if ((destreg = assign_reg(-1)) == -1) {
+      printf("Error: out of registers\n");
+      exit(-1);
+    }
+  }
+
+  if (__is_slli(root, right)) {
+    __slli(destreg, root, left, right);
+  } else if (__is_srai(root, right)) {
+    __srai(destreg, root, left, right);
+  } else if (root->data == SUB) {
+    printf("addi x%d, x%d, -%d\n", destreg, left->data, right->data);
+    SET_NODE(root, REG, destreg);
+    free(left);
+    free(right);
+  } else {
+    __done_w_instr(destreg, root, left, right, /*is_imm=*/1);
+    SET_NODE(root, REG, destreg);
   }
 }
 
 static void __const_reg(node_t *root, node_t *left, node_t *right) {
   char instr[20];
-  int destreg = right->data;
+  int destreg;
 
-  if (left->data >= 2048) {
-    __lui_data(destreg, left);
+  if (left->data & (~0xFFF)) {
+    __lui_data(left);
     generate_code(root);
     return;
   }
 
   if (__is_slli(root, left)) {
+    // Get destination register
+    if (__reuse_reg(right->data) == 1) {
+      destreg = right->data;
+    } else {
+      if ((destreg = assign_reg(-1)) == -1) {
+        printf("Error: out of registers\n");
+        exit(-1);
+      }
+    }
     __slli(destreg, root, right, left);
   } else {
     if ((destreg = assign_reg(-1)) == -1) {
@@ -218,27 +251,33 @@ static void __const_const(node_t *root, node_t *left, node_t *right) {
   free(left);
   free(right);
 
-  switch (*optable[root->data].symbol) {
-    case '+':
+  switch (root->data) {
+    case ADD:
       data = a + b;
       break;
-    case '-':
+    case SUB:
       data = a - b;
       break;
-    case '*':
+    case MUL:
       data = a * b;
       break;
-    case '/':
+    case DIV:
       data = a / b;
       break;
-    case '|':
-      data = a | b;
-      break;
-    case '&':
+    case AND:
       data = a & b;
       break;
-    case '^':
+    case OR:
+      data = a | b;
+      break;
+    case XOR:
       data = a ^ b;
+      break;
+    case SLL:
+      data = a << b;
+      break;
+    case SRL:
+      data = a >> b;
       break;
     default:
       data = 0;

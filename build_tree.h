@@ -54,9 +54,6 @@ void printregtable(void);
 void printvartable(void);
 node_t *generate_code(node_t *);
 
-// Build tree function
-void postorder(node_t *root);
-
 // Main function
 node_t *build_tree(char exprin[]);
 
