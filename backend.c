@@ -117,18 +117,64 @@ static void __reg_reg(node_t *root, node_t *left, node_t *right) {
 
 static void __lui_data(node_t *node) {
   int destreg;
+  int high = node->data >> 12;
+  int low = node->data & 0xFFF;
 
   if ((destreg = assign_reg(-1)) == -1) {
     printf("Error: out of registers\n");
     exit(-1);
   }
 
-  // TODO: Check for negative numbers
+  /* Positive case *
+   * 1000 = 4096  -> li 4096
+   * 17FF = 6143  -> li 4096, addi 2047
+   * 1800 = 6144  -> li 8192, addi -2048
+   * 1801 = 6145  -> li 8192, addi -2047
+   * 2000 = 8192  -> li 8192
 
-  printf("lui x%d, %d\n", destreg, node->data >> 12);
-  if (node->data & 0xFFF) {
-    printf("addi x%d, x%d, %d\n", destreg, destreg, node->data & 0xFFF);
+   * Negative case *
+   * F000 = -4096 -> li -4096
+   * E801 = -6143 -> li -4096, addi -2047
+   * E800 = -6144 -> li -4096, addi -2048
+   * E7FF         -> li -8192, addi 2047
+   * E000 = -8192 -> li -8192
+   */
+
+  if (low >= 0x800) {
+    printf("lui x%d, %d\n", destreg, high + 1);
+    low -= 0x1000;
+  } else {
+    printf("lui x%d, %d\n", destreg, high);
   }
+  printf("addi x%d, x%d, %d\n", destreg, destreg, low);
+
+  /*
+  if (node->data > 0) {
+    if (low >= 0x800) {
+      printf("lui x%d, %d\n", destreg, high + 1);
+      if (low != 0) {
+        printf("addi x%d, x%d, %d\n", destreg, destreg, low - 0x1000);
+      }
+    } else {
+      printf("lui x%d, %d\n", destreg, high);
+      if (low != 0) {
+        printf("addi x%d, x%d, %d\n", destreg, destreg, low);
+      }
+    }
+  } else {
+    if (low >= 0x800) {
+      printf("lui x%d, %d\n", destreg, high + 1);
+      if (low != 0) {
+        printf("addi x%d, x%d, %d\n", destreg, destreg, low - 0x1000);
+      }
+    } else {
+      printf("lui x%d, %d\n", destreg, high);
+      if (low != 0) {
+        printf("addi x%d, x%d, %d\n", destreg, destreg, low);
+      }
+    }
+  }
+  */
 
   SET_NODE(node, REG, destreg);
 }
@@ -168,7 +214,7 @@ static void __reg_const(node_t *root, node_t *left, node_t *right) {
   char instr[20];
   int destreg;
 
-  if (right->data & (~0xFFF)) {
+  if ((right->data > 0xFFF) || (right->data < -2048)) {
     __lui_data(right);
     generate_code(root);
     return;
@@ -216,7 +262,7 @@ static void __const_reg(node_t *root, node_t *left, node_t *right) {
   char instr[20];
   int destreg;
 
-  if (left->data & (~0xFFF)) {
+  if ((right->data > 0xFFF) || (right->data < -2048)) {
     __lui_data(left);
     generate_code(root);
     return;
