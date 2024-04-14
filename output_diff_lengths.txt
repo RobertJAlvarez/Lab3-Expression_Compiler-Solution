@@ -1,0 +1,37 @@
+Expression to parse: V_a<<v_A
+variable table -- register to which var is assigned
+variable: V_a, register: x5
+variable: v_A, register: x6
+register table -- number of uses of each register
+register: x5, uses: 1
+register: x6, uses: 1
+Postfix: V_av_A<<
+sll x5, x5, x6
+root: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+
+Expression to parse: aBc_-Var
+variable table -- register to which var is assigned
+variable: aBc_, register: x5
+variable: Var, register: x6
+register table -- number of uses of each register
+register: x5, uses: 1
+register: x6, uses: 1
+Postfix: aBc_Var-
+sub x5, x5, x6
+root: x5
+register table -- number of uses of each register
+
+Expression to parse: Ram+Zxy_
+variable table -- register to which var is assigned
+variable: Ram, register: x5
+variable: Zxy_, register: x6
+register table -- number of uses of each register
+register: x5, uses: 1
+register: x6, uses: 1
+Postfix: RamZxy_+
+add x5, x5, x6
+root: x5
+register table -- number of uses of each register
+

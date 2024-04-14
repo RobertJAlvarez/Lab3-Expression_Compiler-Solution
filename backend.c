@@ -136,7 +136,7 @@ static void __lui_data(node_t *node) {
    * F000 = -4096 -> li -4096
    * E801 = -6143 -> li -4096, addi -2047
    * E800 = -6144 -> li -4096, addi -2048
-   * E7FF         -> li -8192, addi 2047
+   * E7FF = -6145 -> li -8192, addi 2047
    * E000 = -8192 -> li -8192
    */
 
@@ -262,7 +262,7 @@ static void __const_reg(node_t *root, node_t *left, node_t *right) {
   char instr[20];
   int destreg;
 
-  if ((right->data > 0xFFF) || (right->data < -2048)) {
+  if ((left->data > 0xFFF) || (left->data < -2048)) {
     __lui_data(left);
     generate_code(root);
     return;
@@ -349,6 +349,11 @@ static void __unary_op(node_t *root, node_t *left) {
       printf("sub x%d, x0, x%d\n", destreg, left->data);
       free(left);
       SET_NODE(root, REG, destreg);
+    } else if (left->type == CONST) {
+      SET_NODE(root, CONST, -left->data);
+      root->left = NULL;
+      root->right = NULL;
+      free(left);
     }
   } else if (root->data == NOT) {
     if (left->type == REG) {

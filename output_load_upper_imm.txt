@@ -1,0 +1,52 @@
+Expression to parse: e+6143
+variable table -- register to which var is assigned
+variable: e, register: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+Postfix: e6143+
+lui x6, 1
+addi x6, x6, 2047
+add x5, x5, x6
+root: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+
+Expression to parse: f/-6143
+variable table -- register to which var is assigned
+variable: f, register: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+Postfix: f6143-/
+lui x6, -1
+addi x6, x6, -2047
+div x5, x5, x6
+root: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+
+Expression to parse: -6145<<c
+variable table -- register to which var is assigned
+variable: c, register: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+Postfix: 6145-c<<
+lui x6, -2
+addi x6, x6, 2047
+sll x5, x5, x6
+root: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+
+Expression to parse: 6145*a
+variable table -- register to which var is assigned
+variable: a, register: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+Postfix: 6145a*
+lui x6, 2
+addi x6, x6, -2047
+mul x5, x6, x5
+root: x5
+register table -- number of uses of each register
+register: x5, uses: 1
+
