@@ -75,7 +75,7 @@ int main(void) {
     printf("\n");
 
     // printf("AST:\n");
-    //__print_2D_util(root, 0);
+    // __print_2D_util(root, 0);
 
     root = generate_code(root);
 
