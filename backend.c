@@ -166,15 +166,7 @@ static void __lui_data(node_t *node) {
   SET_NODE(node, REG, destreg);
 }
 
-static void __pre_gen_code(char instr[], int destreg, node_t *root,
-                           node_t *node) {
-  printf("%s\n", instr);
-  SET_NODE(node, REG, destreg);
-  generate_code(root);
-}
-
 static void __reg_const(node_t *root, node_t *left, node_t *right) {
-  char instr[20];
   int destreg;
 
   if ((right->data > 0xFFF) || (right->data < -2048)) {
@@ -188,8 +180,9 @@ static void __reg_const(node_t *root, node_t *left, node_t *right) {
       ((root->data == MUL) || (root->data == DIV))) {
     // Get new register to store constant value
     destreg = __get_new_reg();
-    sprintf(instr, "addi x%d, x0, %d", destreg, right->data);
-    __pre_gen_code(instr, destreg, root, right);
+    printf("addi x%d, x0, %d\n", destreg, right->data);
+    SET_NODE(right, REG, destreg);
+    __reg_reg(root, left, right);
     return;
   }
 
@@ -230,10 +223,15 @@ static void __const_reg(node_t *root, node_t *left, node_t *right) {
     free(left);
     free(right);
     SET_NODE(root, REG, destreg);
+  } else if ((root->data == ADD) || (root->data == AND) || (root->data == OR) ||
+             (root->data == XOR)) {
+    // If operator commute and there is an I-type instruction
+    __reg_const(root, right, left);
   } else {
     destreg = __get_new_reg();
-    sprintf(instr, "addi x%d, x0, %d", destreg, left->data);
-    __pre_gen_code(instr, destreg, root, left);
+    printf("addi x%d, x0, %d\n", destreg, left->data);
+    SET_NODE(left, REG, destreg);
+    __reg_reg(root, left, right);
   }
 }
 
