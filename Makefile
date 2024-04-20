@@ -12,6 +12,9 @@ compile: $(OBJS) main.o
 run: compile
 	./compile
 
+rand: compile
+	python3 rand_exp_gen.py 1 | ./compile
+
 clean:
 	DEL_TXT=$$(find . -name '*.txt' ! -name 'input*' ! -name 'output*'); \
 	rm -f *.o compile $$DEL_TXT
