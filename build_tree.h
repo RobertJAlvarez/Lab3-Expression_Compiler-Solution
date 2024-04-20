@@ -55,16 +55,6 @@ void printvartable(void);
 node_t *generate_code(node_t *);
 
 // Main function
-node_t *build_tree(char exprin[]);
-
-typedef struct {
-  unsigned int top;
-  int ops[MAXOPS];
-} operatorstack_t;
-
-typedef struct {
-  unsigned int top;
-  node_t *nodes[MAXNODES];
-} nodestack_t;
+node_t *build_tree(const char exprin[]);
 
 #endif
