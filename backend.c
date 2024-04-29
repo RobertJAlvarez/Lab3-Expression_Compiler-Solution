@@ -156,7 +156,7 @@ static void __lui_data(node_t *node) {
   } else {
     printf("lui x%d, %d\n", destreg, high);
   }
-  printf("addi x%d, x%d, %d\n", destreg, destreg, low);
+  if (low != 0) printf("addi x%d, x%d, %d\n", destreg, destreg, low);
 
   SET_NODE(node, REG, destreg);
 }
