@@ -1,9 +1,9 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "build_tree.h"
+#include "helper.h"  // position_of_set_bit()
 
 #define SET_NODE(NODE, TYPE, DATA) \
   NODE->type = TYPE;               \
@@ -116,16 +116,12 @@ static void __reg_reg(node_t *root, node_t *left, node_t *right) {
   SET_NODE(root, REG, destreg);
 }
 
-static inline int __isPowerTwo(int n) {
-  return (n & (n - 1)) == 0 ? ((int)log2(n)) : 0;
-}
-
 static inline int __is_slli(node_t *root, node_t *node) {
-  return (root->data == MUL) && (__isPowerTwo(node->data) != 0);
+  return (root->data == MUL) && (position_of_set_bit(node->data) != -1);
 }
 
 static inline int __is_srai(node_t *root, node_t *node) {
-  return (root->data == DIV) && (__isPowerTwo(node->data) != 0);
+  return (root->data == DIV) && (position_of_set_bit(node->data) != -1);
 }
 
 static void __lui_data(node_t *node) {
@@ -166,13 +162,13 @@ static void __reg_const(node_t *root, node_t *left, node_t *right) {
 
   if ((right->data > 0xFFF) || (right->data < -2048)) {
     __lui_data(right);
-    generate_code(root);
+    __reg_reg(root, left, right);
     return;
   }
 
   // muli and divi are not valid instructions. Move constant value to a register
   if (((root->data == MUL) || (root->data == DIV)) &&
-      (!__isPowerTwo(right->data))) {
+      (position_of_set_bit(right->data) == -1)) {
     destreg = __get_new_reg();
 
     printf("addi x%d, x0, %d\n", destreg, right->data);
@@ -188,11 +184,11 @@ static void __reg_const(node_t *root, node_t *left, node_t *right) {
 
   if (__is_slli(root, right)) {
     printf("slli x%d, x%d, %d\n", destreg, left->data,
-           __isPowerTwo(right->data));
+           position_of_set_bit(right->data));
   } else if (__is_srai(root, right)) {
     printf("srai x%d, x%d, %d\n", destreg, left->data,
-           __isPowerTwo(right->data));
-  } else if (root->data == SUB) {
+           position_of_set_bit(right->data));
+  } else if ((root->data == SUB) && (right->data <= 2048)) {
     printf("addi x%d, x%d, -%d\n", destreg, left->data, right->data);
   } else {
     printf("%si x%d, x%d, %d\n", optable[root->data].instr, destreg, left->data,
@@ -209,7 +205,7 @@ static void __const_reg(node_t *root, node_t *left, node_t *right) {
 
   if ((left->data > 0xFFF) || (left->data < -2048)) {
     __lui_data(left);
-    generate_code(root);
+    __reg_reg(root, left, right);
     return;
   }
 
