@@ -35,7 +35,7 @@ void printvartable(void) {
       printf("variable: %c, register: x%d\n", 'a' + i, vartable[i]);
 }
 
-static int __reuse_reg(int reg) {
+static int __reuse_reg(const int reg) {
   if (regtable[reg] == 1) return 1;
   if (regtable[reg] > 1) return 0;
 
@@ -45,7 +45,7 @@ static int __reuse_reg(int reg) {
   return -1;
 }
 
-static int __release_reg(int reg) {
+static int __release_reg(const int reg) {
   if (regtable[reg] > 0) {
     regtable[reg]--;
     return 0;
@@ -54,7 +54,7 @@ static int __release_reg(int reg) {
   return -1;
 }
 
-int assign_reg(int var) {
+int assign_reg(const int var) {
   if ((var != -1) && (vartable[var] != -1)) {
     regtable[vartable[var]]++;  // variable is already assigned a register
     return (vartable[var]);
@@ -86,50 +86,45 @@ static int __get_new_reg(void) {
   return destreg;
 }
 
-static int __get_destreg(node_t *t1, node_t *t2) {
+static int __get_destreg(const int reg1, const int reg2) {
   int destreg;
 
-  if (t1 && __reuse_reg(t1->data) == 1) {
-    destreg = t1->data;
-    if (t2) __release_reg(t2->data);
-  } else if (t2 && __reuse_reg(t2->data) == 1) {
-    destreg = t2->data;
-    __release_reg(t1->data);
+  if (reg1 && __reuse_reg(reg1) == 1) {
+    destreg = reg1;
+    if (reg2) __release_reg(reg2);
+  } else if (reg2 && __reuse_reg(reg2) == 1) {
+    destreg = reg2;
+    __release_reg(reg1);
   } else {
     destreg = __get_new_reg();
-    __release_reg(t1->data);
-    if (t2) __release_reg(t2->data);
+    __release_reg(reg1);
+    if (reg2) __release_reg(reg2);
   }
 
   return destreg;
 }
 
-static void __reg_reg(node_t *root, node_t *left, node_t *right) {
-  int destreg;
+static void __reg_reg(node_t *root, const int l_data, const int r_data) {
+  int destreg = __get_destreg(l_data, r_data);
 
-  destreg = __get_destreg(left, right);
+  printf("%s x%d, x%d, x%d\n", optable[root->data].instr, destreg, l_data,
+         r_data);
 
-  printf("%s x%d, x%d, x%d\n", optable[root->data].instr, destreg, left->data,
-         right->data);
-  free(left);
-  free(right);
   SET_NODE(root, REG, destreg);
 }
 
-static inline int __is_slli(node_t *root, node_t *node) {
-  return (root->data == MUL) && (position_of_set_bit(node->data) != -1);
+static inline int __is_slli(const node_t *root, const int node_data) {
+  return (root->data == MUL) && (position_of_set_bit(node_data) != -1);
 }
 
-static inline int __is_srai(node_t *root, node_t *node) {
-  return (root->data == DIV) && (position_of_set_bit(node->data) != -1);
+static inline int __is_srai(const node_t *root, const int node_data) {
+  return (root->data == DIV) && (position_of_set_bit(node_data) != -1);
 }
 
-static void __lui_data(node_t *node) {
-  int destreg;
-  int high = node->data >> 12;
-  int low = node->data & 0xFFF;
-
-  destreg = __get_new_reg();
+static int __lui_data(const int imm) {
+  const int destreg = __get_new_reg();
+  const int high = imm >> 12;
+  int low = imm & 0xFFF;
 
   /* Positive case *
    * 1000 = 4096  -> li 4096
@@ -154,82 +149,69 @@ static void __lui_data(node_t *node) {
   }
   if (low != 0) printf("addi x%d, x%d, %d\n", destreg, destreg, low);
 
-  SET_NODE(node, REG, destreg);
+  return destreg;
 }
 
-static void __reg_const(node_t *root, node_t *left, node_t *right) {
+static void __reg_const(node_t *root, const int l_data, const int r_data) {
   int destreg;
 
-  if ((right->data > 0xFFF) || (right->data < -2048)) {
-    __lui_data(right);
-    __reg_reg(root, left, right);
+  if ((r_data > 0xFFF) || (r_data < -2048)) {
+    __reg_reg(root, l_data, __lui_data(r_data));
     return;
   }
 
   // muli and divi are not valid instructions. Move constant value to a register
   if (((root->data == MUL) || (root->data == DIV)) &&
-      (position_of_set_bit(right->data) == -1)) {
+      (position_of_set_bit(r_data) == -1)) {
     destreg = __get_new_reg();
 
-    printf("addi x%d, x0, %d\n", destreg, right->data);
+    printf("addi x%d, x0, %d\n", destreg, r_data);
 
-    SET_NODE(right, REG, destreg);
-    __reg_reg(root, left, right);
+    __reg_reg(root, l_data, destreg);
 
     return;
   }
 
   // Get register to assign operation
-  destreg = __get_destreg(left, NULL);
+  destreg = __get_destreg(l_data, 0);
 
-  if (__is_slli(root, right)) {
-    printf("slli x%d, x%d, %d\n", destreg, left->data,
-           position_of_set_bit(right->data));
-  } else if (__is_srai(root, right)) {
-    printf("srai x%d, x%d, %d\n", destreg, left->data,
-           position_of_set_bit(right->data));
-  } else if ((root->data == SUB) && (right->data <= 2048)) {
-    printf("addi x%d, x%d, -%d\n", destreg, left->data, right->data);
+  if (__is_slli(root, r_data)) {
+    printf("slli x%d, x%d, %d\n", destreg, l_data, position_of_set_bit(r_data));
+  } else if (__is_srai(root, r_data)) {
+    printf("srai x%d, x%d, %d\n", destreg, l_data, position_of_set_bit(r_data));
+  } else if ((root->data == SUB) && (r_data <= 2048)) {
+    printf("addi x%d, x%d, -%d\n", destreg, l_data, r_data);
   } else {
-    printf("%si x%d, x%d, %d\n", optable[root->data].instr, destreg, left->data,
-           right->data);
+    printf("%si x%d, x%d, %d\n", optable[root->data].instr, destreg, l_data,
+           r_data);
   }
 
-  free(left);
-  free(right);
   SET_NODE(root, REG, destreg);
 }
 
-static void __const_reg(node_t *root, node_t *left, node_t *right) {
+static void __const_reg(node_t *root, const int l_data, const int r_data) {
   int destreg;
 
-  if ((left->data > 0xFFF) || (left->data < -2048)) {
-    __lui_data(left);
-    __reg_reg(root, left, right);
+  if ((l_data > 0xFFF) || (l_data < -2048)) {
+    __reg_reg(root, __lui_data(l_data), r_data);
     return;
   }
 
   if ((root->data == ADD) || (root->data == AND) || (root->data == OR) ||
-      (root->data == XOR) || (__is_slli(root, left))) {
+      (root->data == XOR) || (__is_slli(root, l_data))) {
     // If operator commute and there is an I-type instruction
-    __reg_const(root, right, left);
+    __reg_const(root, r_data, l_data);
   } else {
     destreg = __get_new_reg();
 
-    printf("addi x%d, x0, %d\n", destreg, left->data);
+    printf("addi x%d, x0, %d\n", destreg, l_data);
 
-    SET_NODE(left, REG, destreg);
-    __reg_reg(root, left, right);
+    __reg_reg(root, destreg, r_data);
   }
 }
 
-static void __const_const(node_t *root, node_t *left, node_t *right) {
-  int a = left->data;
-  int b = right->data;
+static void __const_const(node_t *root, const int a, const int b) {
   int data;
-
-  free(left);
-  free(right);
 
   switch (root->data) {
     case ADD:
@@ -266,55 +248,66 @@ static void __const_const(node_t *root, node_t *left, node_t *right) {
   SET_NODE(root, CONST, data);
 }
 
-static void __unary_op(node_t *root, node_t *left) {
-  int destreg;
+static void __unary_reg(node_t *root, const int l_data) {
+  int destreg = __get_destreg(l_data, 0);
 
-  if (left->type == REG) {
-    destreg = __get_destreg(left, NULL);
-
-    if (root->data == UMINUS) {
-      printf("sub x%d, x0, x%d\n", destreg, left->data);
-    } else if (root->data == NOT) {
-      printf("xori x%d, x%d, -1\n", destreg, left->data);
-    }
-    SET_NODE(root, REG, destreg);
-  } else if (left->type == CONST) {
-    if (root->data == UMINUS) {
-      SET_NODE(root, CONST, -left->data);
-    } else if (root->data == NOT) {
-      SET_NODE(root, CONST, ~left->data);
-    }
+  if (root->data == UMINUS) {
+    printf("sub x%d, x0, x%d\n", destreg, l_data);
+  } else if (root->data == NOT) {
+    printf("xori x%d, x%d, -1\n", destreg, l_data);
   }
 
-  free(left);
+  SET_NODE(root, REG, destreg);
+}
+
+static void __unary_const(node_t *root, const int l_data) {
+  if (root->data == UMINUS) {
+    SET_NODE(root, CONST, -l_data);
+  } else if (root->data == NOT) {
+    SET_NODE(root, CONST, ~l_data);
+  }
 }
 
 node_t *generate_code(node_t *root) {
   node_t *left, *right;
 
-  if (root == NULL) return NULL;
-  if (root->left) left = generate_code(root->left);
-  if (root->right) right = generate_code(root->right);
-
-  // if (root->type == REG) return root;
+  if ((root == NULL) || (root->type == REG)) return root;
 
   if (root->type == VAR) {
     SET_NODE(root, REG, vartable[root->data]);
-  } else if (root->type == BINARYOP) {
+    return root;
+  }
+
+  left = generate_code(root->left);
+  right = generate_code(root->right);
+
+  if (root->type == BINARYOP) {
     if ((left->type == REG) && (right->type == REG)) {
-      __reg_reg(root, left, right);
+      __reg_reg(root, left->data, right->data);
     } else if ((left->type == REG) && (right->type == CONST)) {
-      __reg_const(root, left, right);
+      __reg_const(root, left->data, right->data);
     } else if ((left->type == CONST) && (right->type == REG)) {
-      __const_reg(root, left, right);
+      __const_reg(root, left->data, right->data);
     } else if ((left->type == CONST) && (right->type == CONST)) {
-      __const_const(root, left, right);
+      __const_const(root, left->data, right->data);
+    } else {
+      fprintf(stderr,
+              "Invalid type for right or left node. right->type = %d, "
+              "left->type = %d\n",
+              right->type, left->type);
     }
     root->right = NULL;
+    free(right);
   } else if (root->type == UNARYOP) {
-    __unary_op(root, left);
+    if (left->type == REG) {
+      __unary_reg(root, left->data);
+    } else if (left->type == CONST) {
+      __unary_const(root, left->data);
+    }
   }
+
   root->left = NULL;
+  free(left);
 
   return root;
 }
