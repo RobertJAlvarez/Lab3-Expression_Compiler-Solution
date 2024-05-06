@@ -284,7 +284,7 @@ node_t *build_tree(const char exprin[]) {
 
   // +3 to add a '(', ')', and '\0'
   if ((expr = (char *)malloc((length + 3) * sizeof(char))) == NULL) {
-    fprintf(stderr, "\n");
+    __error_no_memory();
     return NULL;
   }
 
