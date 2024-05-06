@@ -1,16 +1,6 @@
 #ifndef __BUILD_TREE_H__
 #define __BUILD_TREE_H__
 
-#define MAXOPS 100
-#define MAXNODES 100
-#define MAXNUMLENGTH 12
-#define MAXEXPRLENGTH 100
-#define LR 0
-#define RL 1
-#define NUMOPTYPES 13
-#define NUMREG 32
-#define NUMVAR 10
-
 typedef enum { VAR, REG, CONST, UNARYOP, BINARYOP } nodetype_t;
 
 typedef enum {
@@ -30,31 +20,23 @@ typedef enum {
   ERROR_OP
 } ops_t;
 
-typedef struct {
-  nodetype_t type;
-  int prec;
-  int assoc;
-  const char symbol[3];
-  const char instr[4];
-} operator_t;
-
-extern const operator_t optable[];
-
 typedef struct node {
   nodetype_t type;
   int data;
   struct node *left, *right;
 } node_t;
 
-// Back-end functions
+// Share functions in backend.c
 void init_regtable(void);
 void init_vartable(void);
 int assign_reg(int var);
 void printregtable(void);
 void printvartable(void);
+
+// Back-end function
 node_t *generate_code(node_t *);
 
-// Main function
+// Build-tree function
 node_t *build_tree(const char exprin[]);
 
 #endif

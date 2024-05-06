@@ -6,6 +6,12 @@
 
 #include "build_tree.h"
 
+#define MAXOPS 100
+#define MAXNODES 100
+#define MAXNUMLENGTH 12
+#define LR 0
+#define RL 1
+
 struct {
   unsigned int top;
   int ops[MAXOPS];
@@ -16,14 +22,15 @@ struct {
   node_t *nodes[MAXNODES];
 } nstack;
 
-const operator_t optable[NUMOPTYPES] = {
-    {UNARYOP, 7, RL, "-", ""},      {BINARYOP, 5, LR, "+", "add"},
-    {BINARYOP, 5, LR, "-", "sub"},  {BINARYOP, 6, LR, "*", "mul"},
-    {BINARYOP, 6, LR, "/", "div"},  {BINARYOP, 3, LR, "&", "and"},
-    {BINARYOP, 1, LR, "|", "or"},   {BINARYOP, 2, LR, "^", "xor"},
-    {UNARYOP, 6, RL, "~", ""},      {BINARYOP, 4, LR, "<<", "sll"},
-    {BINARYOP, 4, LR, ">>", "srl"}, {UNARYOP, 0, LR, "(", ""},
-    {UNARYOP, 0, LR, ")", ""}};
+const struct {
+  nodetype_t type;
+  int prec;
+  int assoc;
+} optable[] = {{UNARYOP, 7, RL},  {BINARYOP, 5, LR}, {BINARYOP, 5, LR},
+               {BINARYOP, 6, LR}, {BINARYOP, 6, LR}, {BINARYOP, 3, LR},
+               {BINARYOP, 1, LR}, {BINARYOP, 2, LR}, {UNARYOP, 6, RL},
+               {BINARYOP, 4, LR}, {BINARYOP, 4, LR}, {UNARYOP, 0, LR},
+               {UNARYOP, 0, LR}};
 
 static void __error_no_memory(void) {
   fprintf(stderr, "Error: No more memory available. Error: %s\n",
@@ -268,20 +275,29 @@ node_t *build_tree(const char exprin[]) {
   ops_t op;
 
   size_t length, i;
-  char expr[MAXEXPRLENGTH + 2];
+  char *expr;
 
   init_vartable();
   init_regtable();
+
+  length = strlen(exprin);
+
+  // +3 to add a '(', ')', and '\0'
+  if ((expr = (char *)malloc((length + 3) * sizeof(char))) == NULL) {
+    fprintf(stderr, "\n");
+    return NULL;
+  }
+
   expr[0] = '(';
 
-  for (i = 0; i < strlen(exprin); i++) expr[i + 1] = exprin[i];
+  for (i = 0; i < length; i++) expr[i + 1] = exprin[i];
   expr[i + 1] = ')';
   expr[i + 2] = '\0';
 
   opstack.top = 0;
   nstack.top = 0;
 
-  length = strlen(expr);
+  length += 2;
   i = 0;
 
   while (i < length) {

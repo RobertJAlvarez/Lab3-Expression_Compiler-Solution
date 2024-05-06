@@ -5,6 +5,8 @@
 
 #include "build_tree.h"
 
+#define MAXEXPRLENGTH 100
+
 static int get_str(char s[], int lim) {
   int c, i;
 
@@ -15,12 +17,29 @@ static int get_str(char s[], int lim) {
   return i;
 }
 
+static const char *__get_symbol(const ops_t op) {
+  const static struct {
+    ops_t op;
+    const char *symbol;
+  } conversion[] = {
+      {UMINUS, "-"}, {ADD, "+"},  {SUB, "-"},  {MUL, "*"},
+      {DIV, "/"},    {AND, "&"},  {OR, "|"},   {XOR, "^"},
+      {NOT, "~"},    {SLL, "<<"}, {SRL, ">>"},
+  };
+
+  for (size_t i = 0; i < sizeof(conversion) / sizeof(conversion[0]); i++) {
+    if (op == conversion[i].op) return conversion[i].symbol;
+  }
+
+  return "!";
+}
+
 static void __postorder(const node_t *root) {
   if (root) {
     __postorder(root->left);
     __postorder(root->right);
     if (root->type == UNARYOP || root->type == BINARYOP)
-      printf("%s", optable[root->data].symbol);
+      printf("%s", __get_symbol((ops_t)root->data));
     else if (root->type == VAR)
       printf("%c", 'a' + (char)root->data);
     else
@@ -48,7 +67,7 @@ static void __print_2D_util(const node_t *node, const int space) {
       break;
     case UNARYOP:
     case BINARYOP:
-      printf("%s\n", optable[node->data].symbol);
+      printf("%s\n", __get_symbol((ops_t)node->data));
       break;
     default:
       printf("ERROR: Invalid node type\n");

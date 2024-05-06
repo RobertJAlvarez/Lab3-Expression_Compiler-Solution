@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "build_tree.h"
 #include "helper.h"  // position_of_set_bit()
+
+#define NUMREG 32
+#define NUMVAR 10
 
 #define SET_NODE(NODE, TYPE, DATA) \
   NODE->type = TYPE;               \
@@ -104,10 +106,26 @@ static int __get_destreg(const int reg1, const int reg2) {
   return destreg;
 }
 
+static const char *__get_instr(const ops_t op) {
+  const static struct {
+    ops_t op;
+    const char *instr;
+  } conversion[] = {
+      {ADD, "add"}, {SUB, "sub"}, {MUL, "mul"}, {DIV, "div"}, {AND, "and"},
+      {OR, "or"},   {XOR, "xor"}, {SLL, "sll"}, {SRL, "srl"},
+  };
+
+  for (size_t i = 0; i < sizeof(conversion) / sizeof(conversion[0]); i++) {
+    if (op == conversion[i].op) return conversion[i].instr;
+  }
+
+  return "";
+}
+
 static void __reg_reg(node_t *root, const int l_data, const int r_data) {
   int destreg = __get_destreg(l_data, r_data);
 
-  printf("%s x%d, x%d, x%d\n", optable[root->data].instr, destreg, l_data,
+  printf("%s x%d, x%d, x%d\n", __get_instr((ops_t)root->data), destreg, l_data,
          r_data);
 
   SET_NODE(root, REG, destreg);
@@ -182,8 +200,8 @@ static void __reg_const(node_t *root, const int l_data, const int r_data) {
   } else if ((root->data == SUB) && (r_data <= 2048)) {
     printf("addi x%d, x%d, -%d\n", destreg, l_data, r_data);
   } else {
-    printf("%si x%d, x%d, %d\n", optable[root->data].instr, destreg, l_data,
-           r_data);
+    printf("%si x%d, x%d, %d\n", __get_instr((ops_t)root->data), destreg,
+           l_data, r_data);
   }
 
   SET_NODE(root, REG, destreg);
